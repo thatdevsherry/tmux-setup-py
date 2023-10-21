@@ -1,30 +1,34 @@
 import json
 from subprocess import run
 from sys import argv
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 class TmuxPane:
-    name: str
+    cmds: Optional[List[str]]
 
-    def __init__(self, name: str = "zsh"):
-        self.name = name
+    def __init__(self, cmds={}):
+        cmds = cmds.get("cmds")
+        self.cmds = cmds
 
     def __repr__(self):
-        return f"TmuxPane('{self.name}')"
+        return f"TmuxPane({self.cmds})"
 
-    def setup(self, idx: int):
-        if idx == 0:
-            pass
+    def setup(self):
+        """
+        TODO.
+        Run commands if any.
+        """
+        pass
 
 
 class TmuxWindow:
     name: str
     panes: List[TmuxPane]
 
-    def __init__(self, name: str, panes: Optional[List[TmuxPane]] = None):
+    def __init__(self, name: str, panes=None):
         self.name = name
-        self.panes = panes if panes is not None else [TmuxPane()]
+        self.panes = [TmuxPane(i) for i in panes] if panes is not None else [TmuxPane()]
 
     def __repr__(self):
         return f"TmuxWindow('{self.name}', {self.panes})"
@@ -37,17 +41,18 @@ class TmuxWindow:
             run(["tmux", "rename-window", "-t", f"{session_name}:{idx}", self.name])
         else:
             run(["tmux", "new-window", "-t", f"{session_name}:{idx}", "-n", self.name])
-            for idx, pane in enumerate(self.panes):
-                pane.setup(idx)
+
+        for pane in self.panes:
+            pane.setup()
 
 
 class TmuxSession:
     name: str
     windows: List[TmuxWindow]
 
-    def __init__(self, name: str, windows: List[TmuxWindow]):
+    def __init__(self, name: str, windows: Any):
         self.name = name
-        self.windows = windows
+        self.windows = [TmuxWindow(**i) for i in windows]
 
     def __repr__(self):
         return f"TmuxSession({self.name}, {self.windows})"
@@ -56,10 +61,7 @@ class TmuxSession:
         """
         Setup the entire session.
         """
-        # create session
         run(["tmux", "new-session", "-d", "-s", self.name])
-
-        # setup session windows
         for idx, window in enumerate(self.windows):
             if idx == 0:
                 window.setup(self.name, rename=True, idx=idx)
@@ -71,6 +73,8 @@ class TmuxSession:
 if __name__ == "__main__":
     file_path = argv[1]
     with open(file_path) as f:
-        sessions = json.load(f)  # expect array of tmux-session objects
+        sessions = json.load(f)
         for session in sessions:
             tmux_session = TmuxSession(**session)
+            tmux_session.setup()
+            print(tmux_session)
